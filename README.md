@@ -1,6 +1,6 @@
 <div align="center">
 
-# Mouse Fixer
+# Mouse Fixer for Mac
 
 ### Free mouse fixes for macOS
 

@@ -67,6 +67,11 @@ h1 em,h2 em{font-style:italic}
 .item p{color:var(--dim);max-width:46ch}
 .langs{margin-top:44px;display:flex;flex-wrap:wrap;gap:6px 22px;color:var(--dim);font-size:15px;max-width:720px}
 .langs span{transition:color .3s}.langs span:hover{color:var(--fg)}
+.price{display:grid;grid-template-columns:repeat(3,1fr);margin-top:56px;border-top:1px solid var(--line);max-width:900px}
+.price div{padding:28px 0 8px;border-bottom:1px solid var(--line)}
+.price b{display:block;font-family:var(--serif);font-weight:400;font-size:clamp(44px,6vw,96px);line-height:1;color:var(--dim)}
+.price span{display:block;margin-top:10px;font-size:14px;color:var(--dim)}
+.price .us b,.price .us span{color:var(--fg)}
 .final{text-align:center;align-items:center}
 .final h2{font-size:clamp(56px,11vw,190px)}
 footer{padding:40px clamp(20px,6vw,96px);display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;font-size:13px;color:var(--dim);border-top:1px solid var(--line);background:#000}
@@ -165,6 +170,18 @@ footer{padding:40px clamp(20px,6vw,96px);display:flex;justify-content:space-betw
     <div class="item reveal"><b>vi</b><h3>Fifteen languages</h3><p>The interface follows your system language.</p></div>
   </div>
   <div class="langs reveal"><span>English</span><span>Deutsch</span><span>Français</span><span>Español</span><span>Português</span><span>日本語</span><span>简体中文</span><span>繁體中文</span><span>한국어</span><span>Čeština</span><span>Norsk</span><span>Русский</span><span>Türkçe</span><span>Українська</span><span>Tiếng Việt</span></div>
+</section>
+
+<section class="wrap" id="value" data-shape="burst">
+  <p class="idx reveal">05 — The point</p>
+  <h2 class="reveal d1">A $10 mouse,<br><em>made a great one.</em></h2>
+  <p class="lede reveal d2" style="max-width:46ch">Add Mouse Fixer and an ordinary cheap mouse gets the smooth scrolling, gestures and button actions people pay a lot more hardware for: a Logitech MX Master or an Apple Magic Trackpad, often called the best ways to use a Mac.</p>
+  <div class="price reveal d2">
+    <div><b>~$100</b><span>Logitech MX Master</span></div>
+    <div><b>~$130</b><span>Apple Magic Trackpad</span></div>
+    <div class="us"><b>$0</b><span>Mouse Fixer</span></div>
+  </div>
+  <p class="meta reveal d2">Prices are approximate and vary by store. Not affiliated with Logitech or Apple.</p>
 </section>
 
 <section class="wrap final" id="download" data-shape="burst">

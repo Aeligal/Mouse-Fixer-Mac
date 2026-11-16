@@ -2,7 +2,6 @@ import Cocoa
 import SwiftUI
 import ServiceManagement
 import Combine
-import CryptoKit
 import IOKit
 import IOKit.hidsystem
 import UniformTypeIdentifiers
@@ -266,8 +265,6 @@ struct Config: Codable {
     var pointerAccel = true    // off = flat response, no acceleration curve
     var updateURL = ""         // update source: GitHub releases API URL, or JSON with "version" and "url"
     var autoUpdate = false
-    var licenseKey = ""
-    var licenseRequired = false // off: this is your own build, the license never blocks anything unless you switch this on
     var appByPointer = false   // pick per-app settings by the app under the pointer instead of the frontmost one
 }
 
@@ -287,8 +284,6 @@ extension Config {
         appByPointer = try c.decodeIfPresent(Bool.self, forKey: .appByPointer) ?? false
         updateURL = try c.decodeIfPresent(String.self, forKey: .updateURL) ?? ""
         autoUpdate = try c.decodeIfPresent(Bool.self, forKey: .autoUpdate) ?? false
-        licenseKey = try c.decodeIfPresent(String.self, forKey: .licenseKey) ?? ""
-        licenseRequired = try c.decodeIfPresent(Bool.self, forKey: .licenseRequired) ?? false
     }
 }
 
@@ -298,21 +293,18 @@ final class Store: ObservableObject {
     @Published var updateStatus = ""   // result of the last update check (not saved)
     @Published var updateLink: URL?
     @Published var enabled = UserDefaults.standard.object(forKey: "enabled") as? Bool ?? true {
-        didSet { UserDefaults.standard.set(enabled, forKey: "enabled"); Snap.update(cfg, enabled: enabled, licensee: licensee) }
+        didSet { UserDefaults.standard.set(enabled, forKey: "enabled"); Snap.update(cfg, enabled: enabled) }
     }
     @Published var cfg: Config {
         didSet {
             if let d = try? JSONEncoder().encode(cfg) { UserDefaults.standard.set(d, forKey: Store.key) }
-            if cfg.licenseKey != oldValue.licenseKey { licensee = License.verify(cfg.licenseKey) }
-            Snap.update(cfg, enabled: enabled, licensee: licensee)
+            Snap.update(cfg, enabled: enabled)
         }
     }
-    @Published var licensee: String? // cached: verifying a signature on every mouse event would be wasteful
     init() {
         if let d = UserDefaults.standard.data(forKey: Store.key), let c = try? JSONDecoder().decode(Config.self, from: d) { cfg = c }
         else { cfg = Config() }
-        licensee = License.verify(cfg.licenseKey)
-        Snap.update(cfg, enabled: enabled, licensee: licensee)
+        Snap.update(cfg, enabled: enabled)
     }
     /// Per-app profile if the frontmost app has one, otherwise the default.
     func profile(for bundle: String?) -> Profile {
@@ -325,58 +317,19 @@ final class Store: ObservableObject {
 /// The UI edits `Store` on the main thread; the event thread reads this locked copy instead.
 enum Snap {
     private static let lock = NSLock()
-    private static var _cfg = Config(), _enabled = true, _licensee: String?, _front: String?
+    private static var _cfg = Config(), _enabled = true, _front: String?
     static var cfg: Config { lock.lock(); defer { lock.unlock() }; return _cfg }
     static var enabled: Bool { lock.lock(); defer { lock.unlock() }; return _enabled }
-    static var licensee: String? { lock.lock(); defer { lock.unlock() }; return _licensee }
     static var front: String? {
         get { lock.lock(); defer { lock.unlock() }; return _front }
         set { lock.lock(); _front = newValue; lock.unlock() }
     }
-    static func update(_ c: Config, enabled: Bool, licensee: String?) {
-        lock.lock(); _cfg = c; _enabled = enabled; _licensee = licensee; lock.unlock()
+    static func update(_ c: Config, enabled: Bool) {
+        lock.lock(); _cfg = c; _enabled = enabled; lock.unlock()
     }
     static func profile(for bundle: String?) -> Profile {
         let c = cfg
         return c.apps.first { $0.id == bundle }?.profile ?? c.profile
-    }
-}
-
-// MARK: - License
-
-/// Offline license: Ed25519-signed key ("MF1.<payload>.<signature>"), made with tools/license.swift.
-/// 30-day trial. Enforcement is opt-in (Config.licenseRequired).
-enum License {
-    static let publicKey = "lsSygBh3vxsHxhmv5vk41JAXCdOmAenvBfX6rgDKxzc="
-    static let trialDays = 30
-
-    static var trialStart: Date {
-        if let d = UserDefaults.standard.object(forKey: "trialStart") as? Date { return d }
-        let now = Date()
-        UserDefaults.standard.set(now, forKey: "trialStart")
-        return now
-    }
-    static var trialDaysLeft: Int { max(0, trialDays - Int(Date().timeIntervalSince(trialStart) / 86400)) }
-    static var allowed: Bool { true } // free app: nothing is ever locked
-
-    private static func unb64(_ s: String) -> Data? {
-        var t = s.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
-        while t.count % 4 != 0 { t += "=" }
-        return Data(base64Encoded: t)
-    }
-
-    /// Licensee name if the key is genuine and not expired.
-    static func verify(_ key: String) -> String? {
-        let p = key.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ".").map(String.init)
-        guard p.count == 3, p[0] == "MF1", let payload = unb64(p[1]), let sig = unb64(p[2]),
-              let pk = Data(base64Encoded: publicKey), let k = try? Curve25519.Signing.PublicKey(rawRepresentation: pk),
-              k.isValidSignature(sig, for: payload),
-              let j = try? JSONSerialization.jsonObject(with: payload) as? [String: String], let name = j["n"] else { return nil }
-        if let e = j["e"], !e.isEmpty {
-            let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.timeZone = TimeZone(identifier: "UTC")
-            guard let d = f.date(from: e), d.addingTimeInterval(86400) > Date() else { return nil }
-        }
-        return name
     }
 }
 
@@ -1205,8 +1158,6 @@ struct AdvancedView: View {
     @State var sel = "" // "" = all apps, else bundle id
     @State var trusted = AXIsProcessTrusted()
     @State var login = SMAppService.mainApp.status == .enabled
-    @State var keyInput = ""
-    @State var keyMsg = ""
     @State var helperOn = Helper.installed
     let poll = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -1733,9 +1684,6 @@ if let i = CommandLine.arguments.firstIndex(of: "--check-updates"), i + 1 < Comm
 }
 if CommandLine.arguments.contains("--helper-install") { Helper.install(); RunLoop.main.run() } // debug
 if CommandLine.arguments.contains("--helper-uninstall") { Helper.uninstall(); exit(0) } // debug
-if let i = CommandLine.arguments.firstIndex(of: "--verify-license"), i + 1 < CommandLine.arguments.count { // debug
-    print(License.verify(CommandLine.arguments[i + 1]) ?? "invalid"); exit(0)
-}
 if CommandLine.arguments.contains("--print-config") { // debug
     let e = JSONEncoder(); e.outputFormatting = [.sortedKeys]
     print(String(data: try! e.encode(Store.shared.cfg.profile.buttons), encoding: .utf8)!); exit(0)

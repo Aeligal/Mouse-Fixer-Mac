@@ -357,7 +357,7 @@ enum License {
         return now
     }
     static var trialDaysLeft: Int { max(0, trialDays - Int(Date().timeIntervalSince(trialStart) / 86400)) }
-    static var allowed: Bool { !Snap.cfg.licenseRequired || Snap.licensee != nil || trialDaysLeft > 0 }
+    static var allowed: Bool { true } // free app: nothing is ever locked
 
     private static func unb64(_ s: String) -> Data? {
         var t = s.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
@@ -890,7 +890,7 @@ final class Engine {
             return pass
         }
         let cfg = Snap.cfg
-        if ev.getIntegerValueField(.eventSourceUserData) == marker || !Snap.enabled || !License.allowed {
+        if ev.getIntegerValueField(.eventSourceUserData) == marker || !Snap.enabled {
             if !Snap.enabled && !gestures.isEmpty { resetGestures() }
             return pass
         }
@@ -1317,19 +1317,6 @@ struct AdvancedView: View {
                         helperOn = on
                         if on { Helper.install() } else { Helper.uninstall() }
                     }))
-                    Section("License") {
-                        Text(s.licensee.map { String(format: L("Licensed to %@"), $0) }
-                             ?? (License.trialDaysLeft > 0 ? String(format: L("Trial: %d days left"), License.trialDaysLeft) : L("Trial ended")))
-                        HStack {
-                            TextField("License key", text: $keyInput)
-                            Button("Activate") {
-                                if License.verify(keyInput) != nil { s.cfg.licenseKey = keyInput.trimmingCharacters(in: .whitespacesAndNewlines); keyMsg = ""; keyInput = "" }
-                                else { keyMsg = L("Invalid license key") }
-                            }
-                        }
-                        if !keyMsg.isEmpty { Text(keyMsg).font(.caption).foregroundStyle(.red) }
-                        Toggle("Require a license after the trial", isOn: $s.cfg.licenseRequired)
-                    }
                     Section("Updates") {
                         TextField("Update source URL", text: $s.cfg.updateURL)
                         Toggle("Check for updates automatically", isOn: $s.cfg.autoUpdate)

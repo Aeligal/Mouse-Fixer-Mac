@@ -20,7 +20,7 @@ cat > "$APP/Contents/Info.plist" <<P
 <key>CFBundleLocalizations</key><array><string>en</string><string>de</string><string>fr</string><string>es</string><string>pt-BR</string><string>ja</string><string>zh-Hans</string><string>cs</string><string>ko</string><string>nb</string><string>ru</string><string>tr</string><string>uk</string><string>vi</string><string>zh-Hant</string><string>zh-HK</string></array>
 <key>CFBundleName</key><string>Mouse Fixer</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>1.0</string>
+<key>CFBundleShortVersionString</key><string>1.1</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>LSUIElement</key><true/>
 <key>NSPrincipalClass</key><string>NSApplication</string>

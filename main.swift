@@ -447,7 +447,15 @@ enum Pointer {
             if IOHIDGetAccelerationWithKey(handle, key, &v) == 0 { saved = v }
         }
         _ = IOHIDSetAccelerationWithKey(handle, key, c.pointerAccel ? c.pointerSpeed : -1)
+        // macOS can put the system speed back (e.g. a Bluetooth mouse reconnecting), so re-apply every 2 s while on
+        if keeper == nil {
+            keeper = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in
+                let c = Store.shared.cfg
+                if c.pointerEnabled { _ = IOHIDSetAccelerationWithKey(handle, key, c.pointerAccel ? c.pointerSpeed : -1) }
+            }
+        }
     }
+    static var keeper: Timer?
 
     static func restore() {
         guard !skipRestore, let o = saved else { return }
@@ -811,7 +819,7 @@ final class Engine {
             ok = true
             // safety net: if a release was ever missed, never leave the pointer frozen or a Dock swipe hanging
             Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [self] _ in
-                for (n, g) in gestures where CACurrentMediaTime() - max(g.start, g.last) > 8 // quiet for 8 s and the OS says the button is up
+                for (n, g) in gestures where CACurrentMediaTime() - max(g.start, g.last) > 2 // quiet for 2 s and the OS says the button is up
                     && !CGEventSource.buttonState(.combinedSessionState, button: CGMouseButton(rawValue: UInt32(n)) ?? .center) {
                     resetGestures(); break
                 }
@@ -902,7 +910,8 @@ final class Engine {
             default: break
             }
             let now = CACurrentMediaTime()
-            streak = (c.accel && now - lastNotch < 0.08) ? min(streak + 0.2, 2) : 1
+            // fast spins ramp up to 5x, closer to the native wheel acceleration (the old 2x cap felt sluggish)
+            streak = (c.accel && now - lastNotch < 0.12) ? min(streak + 0.4, 5) : 1
             lastNotch = now
             flags = f
             if stage == 2 { emit(0, 0, sp: 0, mp: 3) } // new input cancels running momentum
@@ -1080,6 +1089,7 @@ final class Engine {
         for n in Array(gestures.keys) {
             if let b = c.buttons.first(where: { $0.n == n }), b.scroll != .none {
                 gestures[n]?.fired = true // wheel used: releasing the button is not a click
+                gestures[n]?.last = CACurrentMediaTime() // wheel use counts as activity for the stuck-button safety net
                 return b.scroll
             }
         }
